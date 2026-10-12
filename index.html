@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Petualangan Angkasa Hirarki Gereja Katolik</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #02040a;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+        }
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        .hud-glass {
+            background: rgba(6, 12, 28, 0.45);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+        }
+        .hud-question-glass {
+            background: rgba(4, 9, 22, 0.25);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.3);
+        }
+        .neon-border {
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.3), inset 0 0 15px rgba(56, 189, 248, 0.2);
+        }
+        .scanner-line {
+            background: linear-gradient(to bottom, transparent, rgba(56, 189, 248, 0.5), transparent);
+            animation: scan 3s infinite linear;
+        }
+        @keyframes scan {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(1000%); }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen relative overflow-hidden select-none">
+
+    <!-- CANVAS UNTUK SIMULASI REALISTIS DEEP SPACE -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- OVERLAY SCANNER LINE FOR HUD EFFECT -->
+    <div class="pointer-events-none absolute inset-0 z-0 opacity-20">
+        <div class="w-full h-20 scanner-line"></div>
+    </div>
+
+    <!-- OVERLAY UI (HUD INTERFACE) -->
+    <div id="ui-layer" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 md:p-6 z-10">
+        
+        <!-- HEADER / INSTRUMENT PANEL -->
+        <div class="flex items-center justify-between w-full max-w-5xl mx-auto pointer-events-auto">
+            <div class="hud-glass px-4 py-2.5 rounded-2xl flex items-center gap-3 border border-cyan-500/30">
+                <div class="w-10 h-10 rounded-xl bg-cyan-950/80 border border-cyan-400/50 flex items-center justify-center text-cyan-400 font-extrabold text-lg shadow-[0_0_12px_rgba(56,189,248,0.4)]">
+                    <i class="fa-solid fa-compass"></i>
+                </div>
+                <div>
+                    <div class="text-[10px] text-cyan-400/80 font-bold uppercase tracking-widest font-orbitron">Radar Navigasi Kosmis</div>
+                    <div id="sector-title" class="text-xs md:text-sm font-black text-cyan-200">Sektor 1: Sabuk Asteroid Awam</div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <div class="hud-glass px-4 py-2.5 rounded-2xl flex items-center gap-2 text-amber-400 font-extrabold border border-amber-500/30">
+                    <i class="fa-solid fa-bolt text-amber-400 animate-pulse"></i>
+                    <span id="score-val" class="font-orbitron tracking-wider">0</span>
+                    <span class="text-[10px] text-amber-300/70 ml-1">ENERGY</span>
+                </div>
+                <div class="hud-glass px-4 py-2.5 rounded-2xl flex items-center gap-2 text-cyan-400 font-extrabold border border-cyan-500/30">
+                    <i class="fa-solid fa-crosshairs"></i>
+                    <span id="level-val" class="font-orbitron tracking-wider">1/6</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- RADAR TARGET SEARCH ANNOUNCEMENT CARD -->
+        <div id="question-card" class="hidden pointer-events-auto max-w-2xl mx-auto w-full hud-question-glass rounded-2xl p-3 md:p-4 text-center shadow-lg border border-cyan-500/30 transition-all duration-300 my-auto">
+            <div class="flex items-center justify-between border-b border-cyan-500/10 pb-1.5 mb-2">
+                <span id="badge-rank" class="px-2.5 py-0.5 bg-cyan-500/10 text-cyan-300 border border-cyan-400/30 text-[10px] md:text-[11px] font-bold rounded-full tracking-wider font-orbitron">
+                    Sinyal Anomali: Level 1
+                </span>
+                <span class="text-[10px] md:text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Misi Pencarian
+                </span>
+            </div>
+            
+            <p id="scenario-text" class="text-slate-300/80 italic text-[11px] md:text-xs mb-2 bg-slate-900/30 p-2 rounded-xl border border-slate-800/40 text-cyan-200/80 leading-relaxed">
+                "Kemudikan armada pesawat untuk mendekati koordinat kuis yang melayang!"
+            </p>
+            
+            <h3 id="question-text" class="text-xs md:text-sm font-extrabold text-white drop-shadow-md leading-snug">
+                Memindai ruang angkasa untuk mencari pertanyaan...
+            </h3>
+        </div>
+
+        <!-- CONTROLS & FLIGHT NAVIGATION HELP -->
+        <div id="controls-hint" class="pointer-events-none text-center text-xs text-slate-300 font-medium tracking-wide bg-slate-900/80 backdrop-blur py-2 px-5 rounded-full max-w-sm mx-auto border border-cyan-500/30 shadow-lg">
+            <span class="hidden md:inline"><i class="fa-solid fa-gamepad mr-2 text-cyan-400"></i> Kemudikan dengan <b>[←] [→]</b> atau <b>[A] [D]</b></span>
+            <span class="inline md:hidden"><i class="fa-solid fa-hand-pointer mr-2 text-cyan-400"></i> Sentuh & Geser Layar untuk Menavigasi Pesawat</span>
+        </div>
+    </div>
+
+    <!-- START MISSION OVERLAY -->
+    <div id="start-overlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-lg z-30 flex items-center justify-center p-4">
+        <div class="max-w-lg w-full hud-glass p-8 rounded-3xl text-center space-y-6 border border-cyan-500/50 shadow-[0_0_50px_rgba(56,189,248,0.2)]">
+            <div class="relative w-28 h-28 mx-auto flex items-center justify-center">
+                <div class="absolute inset-0 rounded-full bg-cyan-500/20 animate-ping"></div>
+                <div class="absolute inset-2 rounded-full border-2 border-dashed border-cyan-400/60 animate-[spin_10s_linear_infinite]"></div>
+                <div class="w-20 h-20 rounded-2xl bg-gradient-to-tr from-cyan-600 via-indigo-600 to-sky-400 flex items-center justify-center text-slate-950 text-4xl font-extrabold shadow-xl shadow-cyan-500/30">
+                    <i class="fa-solid fa-shuttle-space"></i>
+                </div>
+            </div>
+            <div>
+                <h1 class="text-2xl md:text-3xl font-black text-white tracking-wider font-orbitron">MISSION LOG: ANGKASA GEREJA</h1>
+                <p class="text-xs md:text-sm text-slate-300 mt-3 leading-relaxed">
+                    Terbangkan kapal penjelajah utama bersama 2 roket pendamping. Arungi luar angkasa bernuansa realistik, lintasi nebula dan bintang-bintang untuk **menemukan dan menabrak portal kuis** hirarki Katolik yang tepat!
+                </p>
+            </div>
+            <button onclick="initAndStartGame()" class="w-full bg-gradient-to-r from-cyan-400 via-sky-400 to-indigo-500 hover:from-cyan-300 hover:to-indigo-400 text-slate-950 font-extrabold py-4 px-6 rounded-2xl shadow-lg shadow-cyan-500/40 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-3 font-orbitron tracking-wide">
+                <i class="fa-solid fa-rocket"></i> LUNCURKAN ARMADA
+            </button>
+        </div>
+    </div>
+
+    <!-- FEEDBACK DIALOG OVERLAY -->
+    <div id="feedback-overlay" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-md z-40 flex items-center justify-center p-4">
+        <div class="max-w-md w-full hud-glass p-6 rounded-3xl text-center space-y-4 border border-cyan-500/40 shadow-2xl">
+            <div id="feedback-icon" class="text-5xl"></div>
+            <h3 id="feedback-title" class="text-2xl font-black font-orbitron"></h3>
+            <p id="feedback-desc" class="text-xs md:text-sm text-slate-300 bg-slate-900/90 p-4 rounded-2xl border border-slate-800 leading-relaxed text-left"></p>
+            <button onclick="resumeNextLevel()" class="w-full bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-extrabold py-3.5 rounded-xl transition flex items-center justify-center gap-2 font-orbitron">
+                Meluncur ke Sektor Berikutnya <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- MISSION COMPLETE RESULT OVERLAY -->
+    <div id="result-overlay" class="hidden absolute inset-0 bg-slate-950/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="max-w-md w-full hud-glass p-8 rounded-3xl text-center space-y-6 border border-amber-500/40 shadow-2xl shadow-amber-500/20">
+            <div class="w-20 h-20 mx-auto rounded-3xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-400 text-4xl shadow-xl">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <div>
+                <h2 class="text-2xl font-black text-white font-orbitron">MISI KOSMIS SELESAI</h2>
+                <p class="text-xs text-slate-400 mt-1">Seluruh sektor hirarki Gereja Katolik telah berhasil dipetakan!</p>
+            </div>
+            <div class="grid grid-cols-2 gap-3 bg-slate-900/90 p-4 rounded-2xl border border-slate-800">
+                <div>
+                    <span class="block text-[10px] text-slate-400 font-orbitron uppercase">Total Energi</span>
+                    <span id="final-score" class="text-2xl font-extrabold text-amber-400 font-orbitron">0</span>
+                </div>
+                <div>
+                    <span class="block text-[10px] text-slate-400 font-orbitron uppercase">Gelar Komandan</span>
+                    <span id="final-rank" class="text-xs font-bold text-cyan-300 mt-1 block">Laksamana Galaksi</span>
+                </div>
+            </div>
+            <button onclick="initAndStartGame()" class="w-full bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-extrabold py-3.5 rounded-xl shadow-lg shadow-amber-500/20 transition hover:scale-105 font-orbitron">
+                <i class="fa-solid fa-rotate-right mr-1"></i> Ulangi Penjelajahan
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const quizData = [
+            {
+                level: 1,
+                rankName: "Kaum Awam (Umat Beriman)",
+                sector: "Sektor 1: Sabuk Asteroid Awam",
+                scenario: "Armada memasuki sabuk asteroid tempat jutaan umat beriman bermukim dan berkarya.",
+                question: "Siapakah seluruh anggota Gereja Katolik yang tidak menerima sakramen imamat namun diutus merasul di dunia?",
+                options: [
+                    { text: "Kaum Awam", correct: true },
+                    { text: "Para Diakon", correct: false },
+                    { text: "Para Kardinal", correct: false }
+                ],
+                explanation: "Kaum Awam adalah anggota Gereja Katolik yang dipanggil untuk menghidupi iman dan menjadi garam serta terang dunia dalam profesi dan keluarga sehari-hari."
+            },
+            {
+                level: 2,
+                rankName: "Biarawan / Biarawati Katolik",
+                sector: "Sektor 2: Klaster Biara Starlight",
+                scenario: "Armada melintasi stasiun biara yang memancarkan ketenangan rohani dan doa.",
+                question: "Kaum beriman yang mengikrarkan kaul kemurnian, kemiskinan, dan ketaatan dalam tarekat atau ordo religius disebut...",
+                options: [
+                    { text: "Biarawan / Biarawati", correct: true },
+                    { text: "Pastor Paroki", correct: false },
+                    { text: "Dewan Keuskupan", correct: false }
+                ],
+                explanation: "Biarawan dan biarawati (suster, bruder, pater ordo) membaktikan hidup sepenuhnya bagi Tuhan dan karya kasih dengan kaul ke Evanjelian."
+            },
+            {
+                level: 3,
+                rankName: "Katekis (Pewarta Iman)",
+                sector: "Sektor 3: Stasiun Pewartaan Lumen",
+                scenario: "Sinyal pendidikan iman berkilauan terang di stasiun antarbintang.",
+                question: "Umat awam atau khusus yang dipanggil untuk mengajar, membimbing, dan mewartakan iman Katolik kepada umat atau katekumen disebut...",
+                options: [
+                    { text: "Katekis", correct: true },
+                    { text: "Uskup Agung", correct: false },
+                    { text: "Koster", correct: false }
+                ],
+                explanation: "Katekis berperan penting dalam mendampingi calon baptis (katekumen) serta memberikan pelajaran agama di sekolah maupun lingkungan."
+            },
+            {
+                level: 4,
+                rankName: "Koster / Sakristan",
+                sector: "Sektor 4: Katedral Pelayanan Altar",
+                scenario: "Kapal menavigasi persiapan liturgi di stasiun ibadat utama.",
+                question: "Petugas yang membantu persiapan liturgi, merawat perlengkapan altar, dan menjaga kebersihan rumah ibadat dinamakan...",
+                options: [
+                    { text: "Koster / Sakristan", correct: true },
+                    { text: "Diakon", correct: false },
+                    { text: "Kardinal", correct: false }
+                ],
+                explanation: "Koster atau sakristan bekerja di balik layar dengan penuh devosi untuk memastikan kelancaran perayaan Ekaristi dan ibadat suci."
+            },
+            {
+                level: 5,
+                rankName: "Diakon",
+                sector: "Sektor 5: Orbit Pelayanan Diakonia",
+                scenario: "Dua roket pengawal mendampingi kapal utama melintasi stasiun ruang pelayanan.",
+                question: "Tingkatan pertama Sakramen Tahbisan yang bertugas melayani sakramen pembaptisan, perkawinan, dan pelayanan kasih adalah...",
+                options: [
+                    { text: "Pastor Paroki", correct: false },
+                    { text: "Diakon", correct: true },
+                    { text: "Uskup Agung", correct: false }
+                ],
+                explanation: "Diakon ditahbiskan untuk tugas pelayanan (diakonia), membawakan firman Tuhan, serta mendampingi komunitas dalam karya amal kasih."
+            },
+            {
+                level: 6,
+                rankName: "Imam / Pastor (Presbiter)",
+                sector: "Sektor 6: Sistem Paroki Nebula",
+                scenario: "Matahari lokal menyinari stasiun-stasiun Paroki yang dikelilingi nebula berdebu.",
+                question: "Rekan kerja Uskup yang memimpin komunitas Paroki serta merayakan Sakramen Ekaristi adalah...",
+                options: [
+                    { text: "Imam / Pastor", correct: true },
+                    { text: "Biarawan Awam", correct: false },
+                    { text: "Kardinal", correct: false }
+                ],
+                explanation: "Imam (Pastor/Romo) menerima sakramen imamat tingkat kedua untuk menggembalakan paroki dan merayakan Ekaristi bersama umat."
+            },
+            {
+                level: 7,
+                rankName: "Uskup (Episkopat)",
+                sector: "Sektor 7: Klaster Keuskupan Galaktik",
+                scenario: "Gugusan planet-planet keuskupan terpancar terang di lintasan angkasa.",
+                question: "Penerus Para Rasul yang memegang kepemimpinan penuh atas wilayah Gereja Lokal (Keuskupan) adalah...",
+                options: [
+                    { text: "Diakon Agung", correct: false },
+                    { text: "Uskup", correct: true },
+                    { text: "Ketua Dewan", correct: false }
+                ],
+                explanation: "Uskup memegang kepenuhan Sakramen Imamat dan bertindak sebagai gembala utama serta pemelihara kesatuan iman di Keuskupannya."
+            },
+            {
+                level: 8,
+                rankName: "Kardinal",
+                sector: "Sektor 8: Rasi Bintang Merah Kardinal",
+                scenario: "Pesawat menembus Rasi Merah tempat Dewan Penasihat Tertinggi berkumpul.",
+                question: "Kelompok Uskup senior terpilih yang bertugas menjadi penasihat utama Paus dan memilih Paus baru (Konklaf) adalah...",
+                options: [
+                    { text: "Para Kardinal", correct: true },
+                    { text: "Para Diakon", correct: false },
+                    { text: "Uskup Suffragan", correct: false }
+                ],
+                explanation: "Para Kardinal diberi gelar khusus oleh Paus untuk membantu kepemimpinan Gereja Universal serta memilih Pemimpin Gereja Katolik baru."
+            },
+            {
+                level: 9,
+                rankName: "Paus (Bapa Suci)",
+                sector: "Sektor 9: Puncak Stasiun Vatikan Utama",
+                scenario: "Armada tiba di pusat tata galaksi! Cahaya spiritual keemasan menaungi seluruh penerbangan.",
+                question: "Siapakah Uskup Roma, penerus Rasul Petrus, dan gembala tertinggi Gereja Katolik Se-Dunia?",
+                options: [
+                    { text: "Ketua KWI", correct: false },
+                    { text: "Paus (Bapa Suci)", correct: true },
+                    { text: "Kardinal Dekan", correct: false }
+                ],
+                explanation: "Paus adalah Pemimpin Utama Gereja Katolik Universal, penerus St. Petrus, dan pemelihara utama kesatuan iman umat Katolik sejagat."
+            },
+            {
+                level: 10,
+                rankName: "Tritugas Yesus (Nabi, Imam, Raja)",
+                sector: "Sektor 10: Inti Galaksi Tritugas Sang Kristus",
+                scenario: "Armada mencapai pusat dimensi kosmis tempat misi utama keselamatan disingkapkan.",
+                question: "Apa sajakah Tritugas Yesus Kristus yang juga diemban oleh seluruh umat beriman melalui pembaptisan?",
+                options: [
+                    { text: "Nabi, Imam, dan Raja", correct: true },
+                    { text: "Pemimpin, Guru, dan Hakim", correct: false },
+                    { text: "Kardinal, Uskup, dan Paus", correct: false }
+                ],
+                explanation: "Sebagai umat beriman, kita ikut mengemban Tritugas Yesus: sebagai Nabi (mewartakan kebenaran), Imam (mempersembahkan hidup), dan Raja (melayani dengan penuh kasih)."
+            }
+        ];
+
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        let currentLevelIndex = 0;
+        let score = 0;
+        let isGameRunning = false;
+        let isWaitingHit = true;
+
+        // Realistic Deep Space Physics & Visual State
+        let stars = [];
+        let nebulaClouds = [];
+        let planets = [];
+        let spaceDust = [];
+        let gates = [];
+        let particles = [];
+
+        // Main Player Ship State
+        const ship = {
+            x: 0,
+            y: 0,
+            width: 50,
+            height: 60,
+            targetX: 0,
+            speed: 0.12,
+            roll: 0 // Visual bank/tilt angle
+        };
+
+        // 2 Escort Companion Rockets State
+        const escorts = [
+            { x: 0, y: 0, offsetX: -75, offsetY: 30, targetX: 0 },
+            { x: 0, y: 0, offsetX: 75, offsetY: 30, targetX: 0 }
+        ];
+
+        // Realistic Central Star / Sun State
+        const sun = {
+            x: 0,
+            y: 110,
+            radius: 85,
+            pulse: 0
+        };
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            ship.y = canvas.height - 120;
+            sun.x = canvas.width / 2;
+            if (!isGameRunning) ship.x = canvas.width / 2;
+        }
+        window.addEventListener("resize", resizeCanvas);
+        resizeCanvas();
+
+        let isTouching = false;
+        window.addEventListener("touchstart", (e) => {
+            isTouching = true;
+            ship.targetX = e.touches[0].clientX;
+        });
+        window.addEventListener("touchmove", (e) => {
+            if (isTouching) ship.targetX = e.touches[0].clientX;
+        });
+        window.addEventListener("touchend", () => isTouching = false);
+
+        window.addEventListener("mousemove", (e) => {
+            ship.targetX = e.clientX;
+        });
+
+        const keys = {};
+        window.addEventListener("keydown", (e) => keys[e.key] = true);
+        window.addEventListener("keyup", (e) => keys[e.key] = false);
+
+        function initRealisticSpace() {
+            // Multi-layered Parallax Stars
+            stars = [];
+            for (let i = 0; i < 220; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 2.2 + 0.3,
+                    speed: Math.random() * 2.5 + 0.2,
+                    alpha: Math.random() * 0.9 + 0.1,
+                    color: Math.random() > 0.8 ? "#7dd3fc" : (Math.random() > 0.8 ? "#fef08a" : "#ffffff")
+                });
+            }
+
+            // Cosmic Space Dust / Tiny Particles
+            spaceDust = [];
+            for (let i = 0; i < 50; i++) {
+                spaceDust.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    length: Math.random() * 12 + 4,
+                    speed: Math.random() * 4 + 2,
+                    alpha: Math.random() * 0.4 + 0.1
+                });
+            }
+
+            // Nebulae background clouds
+            nebulaClouds = [
+                { x: canvas.width * 0.2, y: canvas.height * 0.3, radius: 250, color: "rgba(56, 189, 248, 0.08)" },
+                { x: canvas.width * 0.8, y: canvas.height * 0.6, radius: 300, color: "rgba(147, 51, 234, 0.09)" },
+                { x: canvas.width * 0.5, y: canvas.height * 0.8, radius: 220, color: "rgba(236, 72, 153, 0.06)" }
+            ];
+
+            // Planets with realistic shading and atmospheres
+            planets = [
+                { x: canvas.width * 0.12, y: 220, radius: 42, color1: "#0284c7", color2: "#0f172a", speed: 0.2, ring: true, ringColor: "rgba(56,189,248,0.5)" },
+                { x: canvas.width * 0.88, y: 340, radius: 55, color1: "#9333ea", color2: "#1e1b4b", speed: 0.15, ring: false },
+                { x: canvas.width * 0.72, y: 160, radius: 28, color1: "#e11d48", color2: "#450a0a", speed: 0.25, ring: true, ringColor: "rgba(251,113,133,0.4)" }
+            ];
+        }
+
+        function spawnGates() {
+            gates = [];
+            const data = quizData[currentLevelIndex];
+            const numOptions = data.options.length;
+            const segmentWidth = canvas.width / numOptions;
+
+            data.options.forEach((opt, idx) => {
+                const xCenter = segmentWidth * idx + segmentWidth / 2;
+                gates.push({
+                    x: xCenter,
+                    y: -120,
+                    width: Math.min(segmentWidth * 0.82, 200),
+                    height: 65,
+                    option: opt,
+                    pulse: Math.random() * Math.PI
+                });
+            });
+            isWaitingHit = true;
+        }
+
+        function initAndStartGame() {
+            currentLevelIndex = 0;
+            score = 0;
+            document.getElementById("score-val").textContent = score;
+            document.getElementById("start-overlay").classList.add("hidden");
+            document.getElementById("result-overlay").classList.add("hidden");
+            document.getElementById("feedback-overlay").classList.add("hidden");
+            document.getElementById("question-card").classList.remove("hidden");
+
+            ship.x = canvas.width / 2;
+            ship.targetX = canvas.width / 2;
+
+            initRealisticSpace();
+            loadLevelUI();
+            spawnGates();
+            isGameRunning = true;
+        }
+
+        function loadLevelUI() {
+            const data = quizData[currentLevelIndex];
+            document.getElementById("level-val").textContent = `${data.level}/10`;
+            document.getElementById("sector-title").textContent = data.sector;
+            document.getElementById("badge-rank").textContent = `Level ${data.level}: ${data.rankName}`;
+            document.getElementById("scenario-text").textContent = `"${data.scenario}"`;
+            document.getElementById("question-text").textContent = data.question;
+        }
+
+        function update() {
+            if (!isGameRunning) return;
+
+            // Keyboard navigation
+            if (keys["ArrowLeft"] || keys["a"] || keys["A"]) ship.targetX -= 10;
+            if (keys["ArrowRight"] || keys["d"] || keys["D"]) ship.targetX += 10;
+
+            // Clamp ship target
+            ship.targetX = Math.max(35, Math.min(canvas.width - 35, ship.targetX));
+            
+            // Calculate roll angle based on velocity for realistic flight physics
+            const dx = ship.targetX - ship.x;
+            ship.roll = dx * 0.015; 
+            ship.x += dx * ship.speed;
+
+            // Escorts follow smooth offset
+            escorts[0].x = ship.x + escorts[0].offsetX;
+            escorts[0].y = ship.y + escorts[0].offsetY;
+            escorts[1].x = ship.x + escorts[1].offsetX;
+            escorts[1].y = ship.y + escorts[1].offsetY;
+
+            // Pulse sun animation
+            sun.pulse += 0.03;
+
+            // Scroll Parallax Stars
+            stars.forEach(star => {
+                star.y += star.speed;
+                if (star.y > canvas.height) {
+                    star.y = 0;
+                    star.x = Math.random() * canvas.width;
+                }
+            });
+
+            // Scroll Speed Dust
+            spaceDust.forEach(dust => {
+                dust.y += dust.speed;
+                if (dust.y > canvas.height) {
+                    dust.y = -20;
+                    dust.x = Math.random() * canvas.width;
+                }
+            });
+
+            // Planets drift
+            planets.forEach(p => {
+                p.y += p.speed;
+                if (p.y - p.radius > canvas.height) {
+                    p.y = -120;
+                    p.x = Math.random() * canvas.width;
+                }
+            });
+
+            // Update & Check Gates Collision
+            if (isWaitingHit) {
+                gates.forEach(gate => {
+                    gate.y += 0.45; // Kecepatan gerak portal diperlambat sangat signifikan (dari 1.0 ke 0.45) agar sangat santai saat dibaca
+                    gate.pulse += 0.05;
+
+                    // Hitbox calculation
+                    const shipBox = { left: ship.x - 22, right: ship.x + 22, top: ship.y - 25, bottom: ship.y + 25 };
+                    const gateBox = { left: gate.x - gate.width/2, right: gate.x + gate.width/2, top: gate.y - gate.height/2, bottom: gate.y + gate.height/2 };
+
+                    if (
+                        shipBox.right > gateBox.left &&
+                        shipBox.left < gateBox.right &&
+                        shipBox.bottom > gateBox.top &&
+                        shipBox.top < gateBox.bottom
+                    ) {
+                        handleGateHit(gate.option);
+                    }
+                });
+
+                // Respawn gates if missed
+                if (gates.length > 0 && gates[0].y > canvas.height + 90) {
+                    spawnGates();
+                }
+            }
+
+            // Engine Plasma Exhaust Particles (Main Ship)
+            particles.push({
+                x: ship.x + (Math.random() - 0.5) * 6,
+                y: ship.y + 28,
+                radius: Math.random() * 3.5 + 1.5,
+                color: "#38bdf8",
+                alpha: 0.9,
+                vy: Math.random() * 4 + 3
+            });
+
+            // Exhaust Particles (Escort Rockets)
+            escorts.forEach(esc => {
+                particles.push({
+                    x: esc.x + (Math.random() - 0.5) * 4,
+                    y: esc.y + 18,
+                    radius: Math.random() * 2.5 + 1,
+                    color: "#f59e0b",
+                    alpha: 0.9,
+                    vy: Math.random() * 3 + 2
+                });
+            });
+
+            // Particle Physics
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.y += p.vy;
+                p.alpha -= 0.05;
+                if (p.alpha <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function handleGateHit(selectedOption) {
+            isWaitingHit = false;
+            const data = quizData[currentLevelIndex];
+
+            const feedbackOverlay = document.getElementById("feedback-overlay");
+            const icon = document.getElementById("feedback-icon");
+            const title = document.getElementById("feedback-title");
+            const desc = document.getElementById("feedback-desc");
+
+            if (selectedOption.correct) {
+                score += 100;
+                document.getElementById("score-val").textContent = score;
+                icon.innerHTML = `<i class="fa-solid fa-circle-check text-cyan-400"></i>`;
+                title.textContent = "KOORDINAT TEPAT!";
+                title.className = "text-2xl font-black text-cyan-400 font-orbitron";
+            } else {
+                icon.innerHTML = `<i class="fa-solid fa-circle-xmark text-rose-500"></i>`;
+                title.textContent = "TERJADI MISKALIBRASI!";
+                title.className = "text-2xl font-black text-rose-500 font-orbitron";
+            }
+
+            desc.textContent = data.explanation;
+            feedbackOverlay.classList.remove("hidden");
+        }
+
+        function resumeNextLevel() {
+            document.getElementById("feedback-overlay").classList.add("hidden");
+            currentLevelIndex++;
+
+            if (currentLevelIndex < quizData.length) {
+                loadLevelUI();
+                spawnGates();
+            } else {
+                isGameRunning = false;
+                document.getElementById("question-card").classList.add("hidden");
+                document.getElementById("result-overlay").classList.remove("hidden");
+                document.getElementById("final-score").textContent = score;
+
+                const rankEl = document.getElementById("final-rank");
+                if (score === 1000) rankEl.textContent = "Laksamana Kosmis Hirarki Tertinggi";
+                else if (score >= 700) rankEl.textContent = "Kapten Angkasa Senior";
+                else rankEl.textContent = "Perwira Penjelajah";
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Draw Nebulae
+            nebulaClouds.forEach(neb => {
+                const grad = ctx.createRadialGradient(neb.x, neb.y, 10, neb.x, neb.y, neb.radius);
+                grad.addColorStop(0, neb.color);
+                grad.addColorStop(1, 'transparent');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(neb.x, neb.y, neb.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // 2. Draw Sun / Central Star with Realistic Glow
+            const pulseRadius = sun.radius + Math.sin(sun.pulse) * 4;
+            const sunGlow = ctx.createRadialGradient(sun.x, sun.y, 20, sun.x, sun.y, pulseRadius * 2.8);
+            sunGlow.addColorStop(0, 'rgba(254, 240, 138, 0.9)');
+            sunGlow.addColorStop(0.2, 'rgba(245, 158, 11, 0.6)');
+            sunGlow.addColorStop(0.6, 'rgba(239, 68, 68, 0.2)');
+            sunGlow.addColorStop(1, 'transparent');
+            
+            ctx.fillStyle = sunGlow;
+            ctx.beginPath();
+            ctx.arc(sun.x, sun.y, pulseRadius * 2.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Sun Core
+            const coreGrad = ctx.createRadialGradient(sun.x - 15, sun.y - 15, 0, sun.x, sun.y, pulseRadius);
+            coreGrad.addColorStop(0, '#ffffff');
+            coreGrad.addColorStop(0.4, '#fef08a');
+            coreGrad.addColorStop(0.8, '#f59e0b');
+            coreGrad.addColorStop(1, '#b45309');
+            ctx.fillStyle = coreGrad;
+            ctx.beginPath();
+            ctx.arc(sun.x, sun.y, pulseRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 3. Draw Stars & Cosmic Dust
+            stars.forEach(star => {
+                ctx.fillStyle = star.color;
+                ctx.globalAlpha = star.alpha;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+
+            // Space dust streaks
+            ctx.strokeStyle = "rgba(224, 242, 254, 0.25)";
+            ctx.lineWidth = 1;
+            spaceDust.forEach(dust => {
+                ctx.beginPath();
+                ctx.moveTo(dust.x, dust.y);
+                ctx.lineTo(dust.x, dust.y + dust.length);
+                ctx.stroke();
+            });
+
+            // 4. Draw Detailed Planets
+            planets.forEach(p => {
+                const planetGrad = ctx.createRadialGradient(p.x - p.radius*0.3, p.y - p.radius*0.3, 5, p.x, p.y, p.radius);
+                planetGrad.addColorStop(0, p.color1);
+                planetGrad.addColorStop(0.8, p.color2);
+                planetGrad.addColorStop(1, '#000000');
+
+                ctx.fillStyle = planetGrad;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Planet Ring
+                if (p.ring) {
+                    ctx.strokeStyle = p.ringColor;
+                    ctx.lineWidth = 5;
+                    ctx.beginPath();
+                    ctx.ellipse(p.x, p.y, p.radius * 1.8, p.radius * 0.4, Math.PI / 6, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            });
+
+            // 5. Engine Particles
+            particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.alpha;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            });
+
+            // 6. Draw Realistic Floating Anomaly Gates (Quiz Options)
+            gates.forEach(gate => {
+                ctx.save();
+                ctx.translate(gate.x, gate.y);
+
+                const glow = Math.sin(gate.pulse) * 3;
+
+                // Portal Frame Outer Glow
+                ctx.shadowColor = "#38bdf8";
+                ctx.shadowBlur = 12 + glow;
+
+                // Frame Background Glass
+                ctx.fillStyle = "rgba(6, 18, 42, 0.88)";
+                ctx.strokeStyle = "#38bdf8";
+                ctx.lineWidth = 2;
+                
+                ctx.beginPath();
+                ctx.roundRect(-gate.width/2, -gate.height/2, gate.width, gate.height, 14);
+                ctx.fill();
+                ctx.stroke();
+
+                // Inner Tech Corners
+                ctx.strokeStyle = "#0284c7";
+                ctx.lineWidth = 1.5;
+                const w = gate.width/2 - 4;
+                const h = gate.height/2 - 4;
+                ctx.strokeRect(-w, -h, w*2, h*2);
+
+                // Portal Text
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 13px 'Plus Jakarta Sans', sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(gate.option.text, 0, 0);
+
+                ctx.restore();
+            });
+
+            // 7. Draw Escort Rockets
+            escorts.forEach(esc => {
+                drawEscortRocket(esc.x, esc.y, 22, 34);
+            });
+
+            // 8. Draw Main Realistic Spaceship
+            drawMainSpaceship(ship.x, ship.y, ship.width, ship.height, ship.roll);
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function drawMainSpaceship(x, y, w, h, roll) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(roll); // Banking angle
+
+            // Dynamic Cockpit Glow
+            ctx.shadowColor = "#38bdf8";
+            ctx.shadowBlur = 18;
+
+            // Outer Wings
+            ctx.fillStyle = "#0284c7";
+            ctx.beginPath();
+            ctx.moveTo(0, -h/2 - 4);
+            ctx.lineTo(-w/2 - 4, h/2);
+            ctx.lineTo(-w/4, h/3);
+            ctx.lineTo(w/4, h/3);
+            ctx.lineTo(w/2 + 4, h/2);
+            ctx.closePath();
+            ctx.fill();
+
+            // Main Metal Fuselage
+            const bodyGrad = ctx.createLinearGradient(-w/4, 0, w/4, 0);
+            bodyGrad.addColorStop(0, '#94a3b8');
+            bodyGrad.addColorStop(0.5, '#f8fafc');
+            bodyGrad.addColorStop(1, '#64748b');
+
+            ctx.fillStyle = bodyGrad;
+            ctx.beginPath();
+            ctx.moveTo(0, -h/2 - 8);
+            ctx.lineTo(-w/3, h/3);
+            ctx.lineTo(w/3, h/3);
+            ctx.closePath();
+            ctx.fill();
+
+            // Glass Canopy Cockpit
+            const glassGrad = ctx.createLinearGradient(0, -h/3, 0, 0);
+            glassGrad.addColorStop(0, '#38bdf8');
+            glassGrad.addColorStop(1, '#0284c7');
+            ctx.fillStyle = glassGrad;
+            ctx.beginPath();
+            ctx.ellipse(0, -h/8, 7, 14, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawEscortRocket(x, y, w, h) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            ctx.shadowColor = "#f59e0b";
+            ctx.shadowBlur = 10;
+
+            // Rocket Body
+            ctx.fillStyle = "#e2e8f0";
+            ctx.beginPath();
+            ctx.moveTo(0, -h/2);
+            ctx.quadraticCurveTo(w/2, -10, w/3, h/2);
+            ctx.lineTo(-w/3, h/2);
+            ctx.quadraticCurveTo(-w/2, -10, 0, -h/2);
+            ctx.fill();
+
+            // Rocket Nose Cone
+            ctx.fillStyle = "#f59e0b";
+            ctx.beginPath();
+            ctx.moveTo(0, -h/2);
+            ctx.quadraticCurveTo(w/3, -h/4, w/3, -h/6);
+            ctx.lineTo(-w/3, -h/6);
+            ctx.quadraticCurveTo(-w/3, -h/4, 0, -h/2);
+            ctx.fill();
+
+            // Side Fins
+            ctx.fillStyle = "#d97706";
+            ctx.beginPath();
+            ctx.moveTo(-w/3, h/4);
+            ctx.lineTo(-w/2 - 4, h/2 + 2);
+            ctx.lineTo(-w/3, h/2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(w/3, h/4);
+            ctx.lineTo(w/2 + 4, h/2 + 2);
+            ctx.lineTo(w/3, h/2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+        }
+
+        // Run Loop
+        gameLoop();
+    </script>
+</body>
+</html>
